@@ -1,0 +1,214 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>P2P Demo — Receive (Multi-file)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font: 16px/1.4 system-ui, sans-serif;
+            max-width: 820px;
+            margin: 40px auto;
+        }
+
+        .row {
+            margin: 12px 0;
+        }
+
+        progress {
+            width: 100%;
+            height: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid #eee;
+            padding: 6px 8px;
+            text-align: left;
+        }
+
+        button {
+            padding: 6px 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Receive files</h1>
+    <div class="row">Link ID: <code id="lid"></code></div>
+    <div class="row">Status: <span id="status">Idle</span></div>
+
+    <div class="row">
+        Overall progress:
+        <progress id="progTotal" value="0" max="100"></progress>
+        <div><small><span id="gotBytes">0</span>/<span id="totalBytes">0</span> bytes</small></div>
+    </div>
+
+    <div class="row" id="filesTableWrap" style="display:none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Size</th>
+                    <th>Progress</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="filesTbody"></tbody>
+        </table>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const statusEl = document.getElementById('status');
+        const lidEl = document.getElementById('lid');
+        const progTotal = document.getElementById('progTotal');
+        const gotBytesEl = document.getElementById('gotBytes');
+        const totalBytesEl = document.getElementById('totalBytes');
+        const filesTableWrap = document.getElementById('filesTableWrap');
+        const filesTbody = document.getElementById('filesTbody');
+
+        const params = new URLSearchParams(location.search);
+        const linkId = params.get('id');
+        lidEl.textContent = linkId || '(missing)';
+
+        let socket, pc, dc;
+        let manifest = null;
+        let filesMeta = []; // {name,size,type}
+        let currentIndex = -1;
+        let fileBuffers = [];  // array of arrays of Uint8Array
+        let fileReceived = []; // per-file received bytes
+        let totalSize = 0, totalReceived = 0;
+
+        if (!linkId) setStatus('No link id in URL');
+
+        (async function main() {
+            setStatus('Connecting…');
+            socket = io();
+            socket.emit('join', { linkId, role: 'receiver' });
+            socket.on('signal', async (payload) => {
+                if (payload.type === 'offer') {
+                    await ensurePc();
+                    await pc.setRemoteDescription(payload.sdp);
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    socket.emit('signal', { linkId, payload: { type: 'answer', sdp: answer } });
+                } else if (payload.type === 'ice') {
+                    try { await pc.addIceCandidate(payload.candidate); } catch { }
+                }
+            });
+        })();
+
+        async function ensurePc() {
+            if (pc) return;
+            pc = new RTCPeerConnection({
+                iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+            });
+            pc.onicecandidate = (e) => {
+                if (e.candidate) {
+                    socket.emit('signal', { linkId, payload: { type: 'ice', candidate: e.candidate } });
+                }
+            };
+            pc.ondatachannel = (e) => {
+                dc = e.channel;
+                dc.binaryType = 'arraybuffer';
+                dc.onopen = () => setStatus('Connected. Receiving…');
+                dc.onmessage = onData;
+                dc.onclose = () => setStatus('Data channel closed');
+            };
+        }
+
+        function onData(e) {
+            const data = e.data;
+
+            if (typeof data === 'string') {
+                try {
+                    const msg = JSON.parse(data);
+                    if (msg && msg.type === 'manifest') {
+                        manifest = msg;
+                        filesMeta = msg.files || [];
+                        totalSize = filesMeta.reduce((s, f) => s + (f.size || 0), 0);
+                        totalBytesEl.textContent = totalSize.toString();
+
+                        fileBuffers = filesMeta.map(() => []);
+                        fileReceived = filesMeta.map(() => 0);
+
+                        // build table
+                        filesTableWrap.style.display = 'block';
+                        filesTbody.innerHTML = '';
+                        filesMeta.forEach((f, i) => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                <td>${escapeHtml(f.name)}</td>
+                <td>${f.size}</td>
+                <td><progress max="100" value="0" data-idx="${i}"></progress></td>
+                <td><button disabled data-dl="${i}">Download</button></td>`;
+                            filesTbody.appendChild(tr);
+                        });
+                        return;
+                    }
+                    if (msg && msg.type === 'start') {
+                        currentIndex = msg.index;
+                        return;
+                    }
+                    if (msg && msg.type === 'end') {
+                        const i = msg.index;
+                        // create blob + enable download button
+                        const blob = new Blob(fileBuffers[i], { type: filesMeta[i].type || 'application/octet-stream' });
+                        const url = URL.createObjectURL(blob);
+                        const btn = document.querySelector(`button[data-dl="${i}"]`);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.onclick = () => {
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = filesMeta[i].name || `file_${i}`;
+                                a.click();
+                                setTimeout(() => URL.revokeObjectURL(url), 2000);
+                            };
+                        }
+                        return;
+                    }
+                    if (msg && msg.type === 'all_done') {
+                        setStatus('Completed.');
+                        return;
+                    }
+                } catch {
+                    // not JSON control; ignore
+                }
+            }
+
+            // binary chunk -> belongs to currentIndex
+            const ab = data instanceof ArrayBuffer ? data : (data && data.arrayBuffer ? data.arrayBuffer() : null);
+            if (!ab || currentIndex < 0) return;
+
+            Promise.resolve(ab).then((buf) => {
+                const i = currentIndex;
+                fileBuffers[i].push(new Uint8Array(buf));
+                fileReceived[i] += buf.byteLength;
+
+                // per-file progress
+                const pf = document.querySelector(`progress[data-idx="${i}"]`);
+                const size = filesMeta[i].size || 0;
+                if (pf) pf.value = size ? Math.floor((fileReceived[i] / size) * 100) : 0;
+
+                // overall
+                totalReceived = fileReceived.reduce((s, x) => s + x, 0);
+                gotBytesEl.textContent = totalReceived.toString();
+                const overallP = totalSize ? Math.floor((totalReceived / totalSize) * 100) : 0;
+                progTotal.value = overallP;
+            });
+        }
+
+        function setStatus(s) { statusEl.textContent = s; }
+        function escapeHtml(s) { return (s || '').replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c])); }
+    </script>
+</body>
+
+</html>
