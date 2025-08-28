@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>P2P Demo — Receive Files</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Added Tailwind CSS from CDN and custom fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'heading': ['Space Grotesk', 'sans-serif'],
+                        'body': ['DM Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#ecfeff',
+                            500: '#0891b2',
+                            600: '#0e7490',
+                            700: '#155e75'
+                        },
+                        accent: {
+                            400: '#fbbf24',
+                            500: '#f59e0b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .row {
+            margin: 12px 0;
+        }
+
+        progress {
+            width: 100%;
+            height: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid #eee;
+            padding: 6px 8px;
+            text-align: left;
+        }
+
+        button {
+            padding: 6px 12px;
+        }
+
+        /* Added custom animations and progress bar styling */
+        @keyframes pulse-subtle {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        .animate-pulse-subtle {
+            animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .progress-bar {
+            transition: all 0.3s ease;
+        }
+
+        .status-connecting {
+            color: #f59e0b;
+        }
+
+        .status-connected {
+            color: #10b981;
+        }
+
+        .status-error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 font-body text-slate-800 min-h-screen">
+    <!-- Added modern container with gradient background -->
+    <div class="min-w-4xl mx-auto min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
+        <div class="max-w-4xl mx-auto">
+            <!-- Modern header with improved typography -->
+            <div class="text-center mb-8">
+                <h1 class="font-heading text-4xl font-bold text-slate-900 mb-2">Receive Files</h1>
+                <p class="text-slate-600 text-lg">Securely receive multiple files via peer-to-peer connection</p>
+            </div>
+
+            <!-- Connection status card with modern styling -->
+            <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Connection ID</label>
+                            <div class="bg-slate-100 rounded-lg p-3 font-mono text-sm">
+                                <code id="lid" class="text-primary-600 font-semibold">Loading...</code>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                            <div class="flex items-center space-x-2">
+                                <div id="statusIndicator" class="w-3 h-3 rounded-full bg-slate-400"></div>
+                                <span id="status" class="font-medium">Initializing...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Enhanced overall progress section -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Overall Progress</label>
+                            <div class="space-y-2">
+                                <div class="bg-slate-200 rounded-full h-3 overflow-hidden">
+                                    <div id="progTotal"
+                                        class="progress-bar bg-gradient-to-r from-primary-500 to-primary-600 h-full rounded-full transition-all duration-300"
+                                        style="width: 0%"></div>
+                                </div>
+                                <div class="flex justify-between text-sm text-slate-600">
+                                    <span><span id="gotBytes">0</span> bytes received</span>
+                                    <span><span id="totalBytes">0</span> bytes total</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modern files table with enhanced styling -->
+            <div id="filesTableWrap" class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden"
+                style="display:none;">
+                <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                    <h3 class="font-heading text-lg font-semibold text-slate-900">Files</h3>
+                    <p class="text-sm text-slate-600 mt-1">Track progress and download completed files</p>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    File</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    Size</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    Progress</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="filesTbody" class="bg-white divide-y divide-slate-200">
+                            <!-- Files will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const statusEl = document.getElementById('status');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const lidEl = document.getElementById('lid');
+        const progTotal = document.getElementById('progTotal');
+        const gotBytesEl = document.getElementById('gotBytes');
+        const totalBytesEl = document.getElementById('totalBytes');
+        const filesTableWrap = document.getElementById('filesTableWrap');
+        const filesTbody = document.getElementById('filesTbody');
+
+        const params = new URLSearchParams(location.search);
+        const linkId = params.get('id');
+        lidEl.textContent = linkId || '(missing)';
+
+        let socket, pc, dc;
+        let manifest = null;
+        let filesMeta = []; // {name,size,type}
+        let currentIndex = -1;
+        let fileBuffers = [];  // array of arrays of Uint8Array
+        let fileReceived = []; // per-file received bytes
+        let totalSize = 0, totalReceived = 0;
+
+        if (!linkId) setStatus('No link id in URL', 'error');
+
+        (async function main() {
+            setStatus('Connecting to peer...', 'connecting');
+            socket = io();
+            socket.emit('join', { linkId, role: 'receiver' });
+            socket.on('signal', async (payload) => {
+                if (payload.type === 'offer') {
+                    await ensurePc();
+                    await pc.setRemoteDescription(payload.sdp);
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    socket.emit('signal', { linkId, payload: { type: 'answer', sdp: answer } });
+                } else if (payload.type === 'ice') {
+                    try { await pc.addIceCandidate(payload.candidate); } catch { }
+                }
+            });
+        })();
+
+        async function ensurePc() {
+            if (pc) return;
+            pc = new RTCPeerConnection({
+                iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+            });
+            pc.onicecandidate = (e) => {
+                if (e.candidate) {
+                    socket.emit('signal', { linkId, payload: { type: 'ice', candidate: e.candidate } });
+                }
+            };
+            pc.ondatachannel = (e) => {
+                dc = e.channel;
+                dc.binaryType = 'arraybuffer';
+                dc.onopen = () => setStatus('Connected! Receiving files...', 'connected');
+                dc.onmessage = onData;
+                dc.onclose = () => setStatus('Connection closed', 'error');
+            };
+        }
+
+        function onData(e) {
+            const data = e.data;
+
+            if (typeof data === 'string') {
+                try {
+                    const msg = JSON.parse(data);
+                    if (msg && msg.type === 'manifest') {
+                        manifest = msg;
+                        filesMeta = msg.files || [];
+                        totalSize = filesMeta.reduce((s, f) => s + (f.size || 0), 0);
+                        totalBytesEl.textContent = formatBytes(totalSize);
+
+                        fileBuffers = filesMeta.map(() => []);
+                        fileReceived = filesMeta.map(() => 0);
+
+                        filesTableWrap.style.display = 'block';
+                        filesTbody.innerHTML = '';
+                        filesMeta.forEach((f, i) => {
+                            const tr = document.createElement('tr');
+                            tr.className = 'hover:bg-slate-50 transition-colors';
+                            tr.innerHTML = `
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="flex-shrink-0">
+                                            <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-slate-900">${escapeHtml(f.name)}</div>
+                                            <div class="text-sm text-slate-500">${f.type || 'Unknown type'}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-slate-900 font-medium">${formatBytes(f.size)}</td>
+                                <td class="px-6 py-4">
+                                    <div class="space-y-1">
+                                        <div class="bg-slate-200 rounded-full h-2 overflow-hidden">
+                                            <div class="progress-bar bg-gradient-to-r from-primary-500 to-primary-600 h-full rounded-full transition-all duration-300" data-idx="${i}" style="width: 0%"></div>
+                                        </div>
+                                        <div class="text-xs text-slate-500">0%</div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <button disabled data-dl="${i}" class="inline-flex items-center px-3 py-2 border border-slate-300 shadow-sm text-sm leading-4 font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        Download
+                                    </button>
+                                </td>`;
+                            filesTbody.appendChild(tr);
+                        });
+                        return;
+                    }
+                    if (msg && msg.type === 'start') {
+                        currentIndex = msg.index;
+                        return;
+                    }
+                    if (msg && msg.type === 'end') {
+                        const i = msg.index;
+                        const blob = new Blob(fileBuffers[i], { type: filesMeta[i].type || 'application/octet-stream' });
+                        const url = URL.createObjectURL(blob);
+                        const btn = document.querySelector(`button[data-dl="${i}"]`);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.className = 'inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all';
+                            btn.onclick = () => {
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = filesMeta[i].name || `file_${i}`;
+                                a.click();
+                                setTimeout(() => URL.revokeObjectURL(url), 2000);
+                            };
+                        }
+                        return;
+                    }
+                    if (msg && msg.type === 'all_done') {
+                        setStatus('All files received successfully!', 'connected');
+                        return;
+                    }
+                } catch {
+                    // not JSON control; ignore
+                }
+            }
+
+            // binary chunk -> belongs to currentIndex
+            const ab = data instanceof ArrayBuffer ? data : (data && data.arrayBuffer ? data.arrayBuffer() : null);
+            if (!ab || currentIndex < 0) return;
+
+            Promise.resolve(ab).then((buf) => {
+                const i = currentIndex;
+                fileBuffers[i].push(new Uint8Array(buf));
+                fileReceived[i] += buf.byteLength;
+
+                const progressBar = document.querySelector(`div[data-idx="${i}"]`);
+                const size = filesMeta[i].size || 0;
+                const percentage = size ? Math.floor((fileReceived[i] / size) * 100) : 0;
+                if (progressBar) {
+                    progressBar.style.width = `${percentage}%`;
+                    const percentageText = progressBar.parentElement.nextElementSibling;
+                    if (percentageText) percentageText.textContent = `${percentage}%`;
+                }
+
+                totalReceived = fileReceived.reduce((s, x) => s + x, 0);
+                gotBytesEl.textContent = formatBytes(totalReceived);
+                const overallP = totalSize ? Math.floor((totalReceived / totalSize) * 100) : 0;
+                progTotal.style.width = `${overallP}%`;
+            });
+        }
+
+        function setStatus(s, type = 'idle') {
+            statusEl.textContent = s;
+            statusIndicator.className = 'w-3 h-3 rounded-full transition-all';
+
+            switch (type) {
+                case 'connecting':
+                    statusIndicator.className += ' bg-accent-500 animate-pulse-subtle';
+                    statusEl.className = 'font-medium status-connecting';
+                    break;
+                case 'connected':
+                    statusIndicator.className += ' bg-green-500';
+                    statusEl.className = 'font-medium status-connected';
+                    break;
+                case 'error':
+                    statusIndicator.className += ' bg-red-500';
+                    statusEl.className = 'font-medium status-error';
+                    break;
+                default:
+                    statusIndicator.className += ' bg-slate-400';
+                    statusEl.className = 'font-medium text-slate-600';
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function escapeHtml(s) { return (s || '').replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c])); }
+    </script>
+</body>
+
+</html>
