@@ -13,7 +13,7 @@ const io = new Server(server, {
 app.use(express.static('public'));
 
 // pretty routes
-app.get('/send', (_req, res) =>
+app.get('/', (_req, res) =>
     res.sendFile(path.join(__dirname, 'public', 'send.html'))
 );
 app.get('/receive', (_req, res) =>
@@ -42,7 +42,7 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`P2P demo running on http://localhost:${PORT}`);
 });

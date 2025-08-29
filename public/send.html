@@ -1,145 +1,356 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-    <meta charset="utf-8" />
-    <title>P2P Demo — Send (Multi-file)</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P File Sharing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#ffffff',
+                        foreground: '#0f172a',
+                        card: '#ffffff',
+                        'card-foreground': '#0f172a',
+                        primary: '#0891b2',
+                        'primary-foreground': '#ffffff',
+                        secondary: '#f1f5f9',
+                        'secondary-foreground': '#0f172a',
+                        muted: '#f8fafc',
+                        'muted-foreground': '#64748b',
+                        accent: '#f59e0b',
+                        'accent-foreground': '#ffffff',
+                        destructive: '#ef4444',
+                        'destructive-foreground': '#ffffff',
+                        border: '#e2e8f0',
+                        input: '#ffffff',
+                    }
+                }
+            }
+        }
+    </script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <style>
         body {
-            font: 16px/1.4 system-ui, sans-serif;
-            max-width: 820px;
-            margin: 40px auto;
+            font-family: 'DM Sans', sans-serif;
         }
 
-        .row {
-            margin: 12px 0;
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: 'Space Grotesk', sans-serif;
         }
 
-        progress {
-            width: 100%;
-            height: 16px;
-        }
-
-        code {
-            background: #f1f3f5;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            border-bottom: 1px solid #eee;
-            padding: 6px 8px;
-            text-align: left;
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 
-<body>
-    <h1>Send files (P2P)</h1>
+<body class="min-h-screen bg-background">
+    <div class="max-w-4xl mx-auto p-6">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-foreground mb-2">P2P File Sharing</h1>
+            <p class="text-muted-foreground text-lg">Share files directly between devices, no cloud storage needed</p>
+        </div>
 
-    <div class="row">
-        <input id="files" type="file" multiple />
+        <!-- Main Card -->
+        <div class="bg-card rounded-xl border border-border shadow-sm p-8 mb-6">
+            <!-- File Upload Section -->
+            <div class="mb-8">
+                <label class="block text-sm font-medium text-card-foreground mb-4">Select Files to Share</label>
+                <div id="dropZone"
+                    class="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
+                    <!-- Upload Icon (using Unicode) -->
+                    <div class="w-12 h-12 text-muted-foreground mx-auto mb-4 flex items-center justify-center text-2xl">
+                        📁</div>
+                    <p id="fileSelectText" class="text-card-foreground font-medium mb-2">Click to select files or drag
+                        and drop</p>
+                    <p class="text-muted-foreground text-sm">Multiple files supported • No size limit</p>
+                    <input id="fileInput" type="file" multiple class="hidden">
+                </div>
+            </div>
+
+            <!-- Create Link Button -->
+            <div class="mb-8">
+                <button id="createLinkBtn" disabled
+                    class="w-full bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <span class="text-lg">🔗</span>
+                    <span id="buttonText">Create Share Link</span>
+                </button>
+            </div>
+
+            <!-- Share Link Display -->
+            <div id="shareLinkSection" class="mb-8 p-4 bg-muted rounded-lg hidden">
+                <label class="block text-sm font-medium text-card-foreground mb-2">
+                    Share this link with the receiver:
+                </label>
+                <div class="flex gap-2">
+                    <input id="shareLinkInput" type="text" readonly
+                        class="flex-1 bg-input border border-border rounded-md px-3 py-2 text-sm">
+                    <button id="copyBtn"
+                        class="bg-secondary hover:bg-secondary/90 text-secondary-foreground px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        Copy
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Section -->
+            <div class="mb-8">
+                <div class="flex items-center gap-3 mb-4">
+                    <span id="statusIcon" class="text-lg">📡</span>
+                    <span id="statusText" class="text-card-foreground font-medium">Status: Ready to share files</span>
+                </div>
+
+                <div id="overallProgress" class="space-y-2 hidden">
+                    <div class="flex justify-between text-sm text-muted-foreground">
+                        <span>Overall Progress</span>
+                        <span id="progressText">0 Bytes / 0 Bytes</span>
+                    </div>
+                    <div class="w-full bg-muted rounded-full h-2">
+                        <div id="progressBar" class="bg-primary h-2 rounded-full transition-all duration-300"
+                            style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Files Table -->
+            <div id="filesTable" class="overflow-hidden rounded-lg border border-border hidden">
+                <table class="w-full">
+                    <thead class="bg-muted">
+                        <tr>
+                            <th class="text-left py-3 px-4 font-medium text-card-foreground">File</th>
+                            <th class="text-left py-3 px-4 font-medium text-card-foreground">Size</th>
+                            <th class="text-left py-3 px-4 font-medium text-card-foreground">Progress</th>
+                            <th class="text-left py-3 px-4 font-medium text-card-foreground">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="filesTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center text-muted-foreground text-sm">
+            <p>Files are transferred directly between devices using WebRTC technology</p>
+        </div>
     </div>
-
-    <div class="row">
-        <button id="createLink" disabled>Create link</button>
-    </div>
-
-    <div class="row" id="linkBox" style="display:none;">
-        Share this link with the receiver:<br>
-        <input id="shareLink" style="width:100%;" readonly />
-    </div>
-
-    <div class="row">
-        <div>Status: <span id="status">Idle</span></div>
-        <div>Overall progress:</div>
-        <progress id="progTotal" value="0" max="100"></progress>
-        <div><small><span id="sentBytes">0</span>/<span id="totalBytes">0</span> bytes</small></div>
-    </div>
-
-    <div class="row" id="filesTableWrap" style="display:none;">
-        <table>
-            <thead>
-                <tr>
-                    <th>File</th>
-                    <th>Size</th>
-                    <th>Progress</th>
-                </tr>
-            </thead>
-            <tbody id="filesTbody"></tbody>
-        </table>
-    </div>
-
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const input = document.getElementById('files');
-        const createBtn = document.getElementById('createLink');
-        const linkBox = document.getElementById('linkBox');
-        const shareLink = document.getElementById('shareLink');
-        const statusEl = document.getElementById('status');
-        const progTotal = document.getElementById('progTotal');
-        const sentBytesEl = document.getElementById('sentBytes');
-        const totalBytesEl = document.getElementById('totalBytes');
-        const filesTableWrap = document.getElementById('filesTableWrap');
-        const filesTbody = document.getElementById('filesTbody');
+        // Global state
+        let selectedFiles = [];
+        let fileProgress = [];
+        let shareLink = '';
+        let totalSize = 0;
+        let totalSent = 0;
+        let isConnected = false;
+        let linkId, socket, pc, dc;
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const fileSelectText = document.getElementById('fileSelectText');
+        const createLinkBtn = document.getElementById('createLinkBtn');
+        const buttonText = document.getElementById('buttonText');
+        const shareLinkSection = document.getElementById('shareLinkSection');
+        const shareLinkInput = document.getElementById('shareLinkInput');
+        const copyBtn = document.getElementById('copyBtn');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusText = document.getElementById('statusText');
+        const overallProgress = document.getElementById('overallProgress');
+        const progressText = document.getElementById('progressText');
+        const progressBar = document.getElementById('progressBar');
+        const filesTable = document.getElementById('filesTable');
+        const filesTableBody = document.getElementById('filesTableBody');
 
-        let files = [], linkId, socket, pc, dc;
-        let perFileSent = [];
-        let totalSize = 0, totalSent = 0;
+        // Utility functions
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
 
-        input.addEventListener('change', () => {
-            files = Array.from(input.files || []);
-            createBtn.disabled = files.length === 0;
-            if (!files.length) return;
-            // build table
-            filesTableWrap.style.display = 'block';
-            filesTbody.innerHTML = '';
-            perFileSent = files.map(() => 0);
-            totalSize = files.reduce((s, f) => s + f.size, 0);
-            totalSent = 0;
-            totalBytesEl.textContent = totalSize.toString();
-            sentBytesEl.textContent = '0';
+        function generateId() {
+            return Math.random().toString(36).substring(2, 15);
+        }
 
-            for (const f of files) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-          <td>${escapeHtml(f.name)}</td>
-          <td>${f.size}</td>
-          <td>
-            <progress max="100" value="0" data-name="${escapeHtml(f.name)}"></progress>
-          </td>`;
-                filesTbody.appendChild(tr);
+        function updateStatus(status) {
+            statusText.textContent = `Status: ${status}`;
+
+            // Update status icon
+            if (status.includes('Connected')) {
+                statusIcon.textContent = '📶';
+            } else if (status.includes('Waiting')) {
+                statusIcon.textContent = '⏳';
+            } else if (status.includes('Error')) {
+                statusIcon.textContent = '❌';
+            } else {
+                statusIcon.textContent = '📡';
             }
+        }
+
+        function updateOverallProgress() {
+            if (totalSize > 0) {
+                const percentage = (totalSent / totalSize) * 100;
+                progressBar.style.width = `${percentage}%`;
+                progressText.textContent = `${formatBytes(totalSent)} / ${formatBytes(totalSize)}`;
+                overallProgress.classList.remove('hidden');
+            }
+        }
+
+        function updateFileProgress(index, progress, status) {
+            fileProgress[index].progress = progress;
+            fileProgress[index].status = status;
+
+            const row = filesTableBody.children[index];
+            if (row) {
+                const progressCell = row.children[2];
+                const statusCell = row.children[3];
+
+                const progressBarElement = progressCell.querySelector('.progress-bar');
+                progressBarElement.style.width = `${progress}%`;
+
+                // Update progress bar color based on status
+                progressBarElement.className = `progress-bar h-2 rounded-full transition-all duration-300 ${status === 'completed' ? 'bg-green-500' :
+                    status === 'uploading' ? 'bg-primary' :
+                        status === 'error' ? 'bg-destructive' : 'bg-muted'
+                    }`;
+
+                // Update status text and icon
+                const statusTextElement = statusCell.querySelector('.status-text');
+                const statusIconElement = statusCell.querySelector('.status-icon');
+                statusTextElement.textContent = status;
+
+                if (status === 'completed') {
+                    statusIconElement.textContent = '✅';
+                } else if (status === 'uploading') {
+                    statusIconElement.textContent = '⏳';
+                } else if (status === 'error') {
+                    statusIconElement.textContent = '❌';
+                } else {
+                    statusIconElement.textContent = '⏸️';
+                }
+            }
+        }
+
+        function renderFilesTable() {
+            filesTableBody.innerHTML = '';
+
+            fileProgress.forEach((file, index) => {
+                const row = document.createElement('tr');
+                row.className = 'border-t border-border';
+                row.innerHTML = `
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-muted-foreground">📄</span>
+                            <span class="text-card-foreground text-sm font-medium truncate max-w-xs">${file.name}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-sm text-muted-foreground">${formatBytes(file.size)}</td>
+                    <td class="py-3 px-4">
+                        <div class="w-full bg-muted rounded-full h-2">
+                            <div class="progress-bar h-2 rounded-full transition-all duration-300 bg-muted" style="width: ${file.progress}%"></div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-2">
+                            <span class="status-icon">⏸️</span>
+                            <span class="status-text text-sm text-muted-foreground">${file.status}</span>
+                        </div>
+                    </td>
+                `;
+                filesTableBody.appendChild(row);
+            });
+
+            filesTable.classList.remove('hidden');
+        }
+
+        function simulateFileTransfer() {
+            // This function is kept for testing purposes but not used in real transfer
+            fileProgress.forEach((file, index) => {
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += Math.random() * 15;
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(interval);
+                        updateFileProgress(index, 100, 'completed');
+                    } else {
+                        updateFileProgress(index, progress, 'uploading');
+                    }
+
+                    // Update total progress
+                    const currentTotal = fileProgress.reduce((sum, f, i) => {
+                        const currentProgress = i === index ? progress : f.progress;
+                        return sum + (f.size * currentProgress) / 100;
+                    }, 0);
+                    totalSent = currentTotal;
+                    updateOverallProgress();
+                }, 200);
+            });
+        }
+
+        // Event listeners
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
         });
 
-        createBtn.addEventListener('click', async () => {
-            if (!files.length) return;
-            linkId = genId();
-            const url = `${location.origin}/receive?id=${linkId}`;
-            shareLink.value = url;
-            linkBox.style.display = 'block';
-            setStatus('Waiting for receiver…');
+        fileInput.addEventListener('change', (event) => {
+            selectedFiles = Array.from(event.target.files || []);
 
-            // signaling
-            socket = io();
-            socket.emit('join', { linkId, role: 'sender' });
-            socket.on('peer-joined', ({ role }) => {
-                if (role === 'receiver') startConnection();
-            });
-            socket.on('signal', async (payload) => {
-                if (payload.type === 'answer') {
-                    await pc.setRemoteDescription(payload.sdp);
-                } else if (payload.type === 'ice') {
-                    try { await pc.addIceCandidate(payload.candidate); } catch { }
+            if (selectedFiles.length > 0) {
+                fileSelectText.textContent = `${selectedFiles.length} file(s) selected`;
+                createLinkBtn.disabled = false;
+
+                // Initialize file progress
+                fileProgress = selectedFiles.map(file => ({
+                    name: file.name,
+                    size: file.size,
+                    progress: 0,
+                    status: 'pending'
+                }));
+
+                totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+                totalSent = 0;
+
+                renderFilesTable();
+
+                // Show total size info
+                const totalSizeText = document.createElement('p');
+                totalSizeText.className = 'text-sm text-muted-foreground mt-2';
+                totalSizeText.textContent = `Total size: ${formatBytes(totalSize)}`;
+
+                // Remove existing total size text if any
+                const existingTotalSize = dropZone.querySelector('.total-size-text');
+                if (existingTotalSize) {
+                    existingTotalSize.remove();
                 }
-            });
+
+                totalSizeText.classList.add('total-size-text');
+                dropZone.appendChild(totalSizeText);
+            } else {
+                fileSelectText.textContent = 'Click to select files or drag and drop';
+                createLinkBtn.disabled = true;
+                filesTable.classList.add('hidden');
+                overallProgress.classList.add('hidden');
+
+                // Remove total size text
+                const existingTotalSize = dropZone.querySelector('.total-size-text');
+                if (existingTotalSize) {
+                    existingTotalSize.remove();
+                }
+            }
         });
 
         async function startConnection() {
@@ -153,22 +364,30 @@
             };
             dc = pc.createDataChannel('file', { ordered: true });
             dc.binaryType = 'arraybuffer';
-            dc.onopen = () => sendFiles();
-            dc.onclose = () => setStatus('Data channel closed');
+            dc.onopen = () => {
+                updateStatus('Connected! Starting file transfer...');
+                buttonText.textContent = 'Transferring Files';
+                sendFiles();
+            };
+            dc.onclose = () => updateStatus('Connection closed');
+            dc.onerror = (error) => updateStatus('Connection error');
 
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             socket.emit('signal', { linkId, payload: { type: 'offer', sdp: offer } });
         }
-
         async function sendFiles() {
-            setStatus('Connected. Sending…');
+            // Track bytes sent per file
+            let perFileSent = Array(selectedFiles.length).fill(0);
+
+            // Show progress elements
+            overallProgress.classList.remove('hidden');
 
             // 1) send MANIFEST with list of files
             const manifest = {
                 type: 'manifest',
                 version: 1,
-                files: files.map(f => ({ name: f.name, size: f.size, type: f.type }))
+                files: selectedFiles.map(f => ({ name: f.name, size: f.size, type: f.type }))
             };
             dc.send(JSON.stringify(manifest));
 
@@ -178,8 +397,9 @@
             dc.bufferedAmountLowThreshold = low;
 
             // 2) send each file with start/end markers
-            for (let i = 0; i < files.length; i++) {
-                const f = files[i];
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const f = selectedFiles[i];
+                updateFileProgress(i, 0, 'uploading');
                 dc.send(JSON.stringify({ type: 'start', index: i, name: f.name, size: f.size, fileType: f.type || 'application/octet-stream' }));
 
                 let offset = 0;
@@ -188,43 +408,165 @@
                     dc.send(slice);
                     offset += slice.byteLength;
 
-                    // progress
+                    // Update progress
                     perFileSent[i] = offset;
                     totalSent = perFileSent.reduce((s, x) => s + x, 0);
-                    sentBytesEl.textContent = totalSent.toString();
-                    const overallP = totalSize ? Math.floor((totalSent / totalSize) * 100) : 0;
-                    progTotal.value = overallP;
 
-                    const pf = document.querySelector(`progress[data-name="${cssSel(f.name)}"]`);
-                    if (pf) pf.value = f.size ? Math.floor((offset / f.size) * 100) : 0;
+                    // Update individual file progress
+                    const fileProgress = f.size ? Math.floor((offset / f.size) * 100) : 0;
+                    updateFileProgress(i, fileProgress, 'uploading');
+
+                    // Update overall progress
+                    updateOverallProgress();
 
                     if (dc.bufferedAmount > low) await waitForBufferLow();
                 }
 
+                // Mark file as completed
+                updateFileProgress(i, 100, 'completed');
                 dc.send(JSON.stringify({ type: 'end', index: i }));
             }
 
             // 3) all done
             dc.send(JSON.stringify({ type: 'all_done' }));
-            setStatus('Done.');
+            updateStatus('All files sent successfully!');
+            buttonText.textContent = 'Transfer Complete';
+
+            // Add reset functionality
+            setTimeout(() => {
+                const resetBtn = document.createElement('button');
+                resetBtn.textContent = 'Send More Files';
+                resetBtn.className = 'w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-medium py-3 px-6 rounded-lg transition-colors mt-4';
+                resetBtn.addEventListener('click', () => {
+                    // Reset all state
+                    selectedFiles = [];
+                    fileProgress = [];
+                    totalSize = 0;
+                    totalSent = 0;
+
+                    // Reset UI
+                    fileSelectText.textContent = 'Click to select files or drag and drop';
+                    createLinkBtn.disabled = true;
+                    createLinkBtn.textContent = 'Create Share Link';
+                    buttonText.textContent = 'Create Share Link';
+                    filesTable.classList.add('hidden');
+                    overallProgress.classList.add('hidden');
+                    shareLinkSection.classList.add('hidden');
+                    updateStatus('Ready to share files');
+
+                    // Remove total size text
+                    const existingTotalSize = dropZone.querySelector('.total-size-text');
+                    if (existingTotalSize) {
+                        existingTotalSize.remove();
+                    }
+
+                    // Clean up connections
+                    if (dc) dc.close();
+                    if (pc) pc.close();
+                    if (socket) socket.disconnect();
+
+                    resetBtn.remove();
+                });
+
+                createLinkBtn.parentNode.appendChild(resetBtn);
+            }, 2000);
         }
 
+        // Helper function for buffer flow control
         function waitForBufferLow() {
-            return new Promise((resolve) => {
-                const onLow = () => { dc.removeEventListener('bufferedamountlow', onLow); resolve(); };
-                dc.addEventListener('bufferedamountlow', onLow);
-                setTimeout(() => { try { dc.removeEventListener('bufferedamountlow', onLow); } catch { }; resolve(); }, 150);
+            return new Promise(resolve => {
+                const checkBuffer = () => {
+                    if (dc.bufferedAmount <= dc.bufferedAmountLowThreshold) {
+                        resolve();
+                    } else {
+                        setTimeout(checkBuffer, 10);
+                    }
+                };
+                checkBuffer();
             });
         }
+        createLinkBtn.addEventListener('click', () => {
+            if (selectedFiles.length === 0) return;
 
-        function setStatus(s) { statusEl.textContent = s; }
-        function genId() {
-            const arr = new Uint8Array(9);
-            crypto.getRandomValues(arr);
-            return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
-        }
-        function escapeHtml(s) { return s.replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c])); }
-        function cssSel(s) { return s.replace(/"/g, '\\"'); }
+            linkId = generateId();
+            shareLink = `${window.location.origin}/receive?id=${linkId}`;
+            shareLinkInput.value = shareLink;
+            shareLinkSection.classList.remove('hidden');
+            buttonText.textContent = 'Waiting for Connection';
+            createLinkBtn.disabled = true;
+
+            // signaling
+            socket = io();
+            socket.emit('join', { linkId, role: 'sender' });
+            socket.on('peer-joined', ({ role }) => {
+                if (role === 'receiver') {
+                    updateStatus('Receiver connected! Establishing secure connection...');
+                    startConnection();
+                }
+            });
+            socket.on('signal', async (payload) => {
+                if (payload.type === 'answer') {
+                    await pc.setRemoteDescription(payload.sdp);
+                } else if (payload.type === 'ice') {
+                    try { await pc.addIceCandidate(payload.candidate); } catch { }
+                }
+            });
+            updateStatus('Waiting for receiver to connect...');
+        });
+
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(shareLink).then(() => {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = 'Copied!';
+                copyBtn.classList.add('bg-green-500', 'text-white');
+                copyBtn.classList.remove('bg-secondary', 'text-secondary-foreground');
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.classList.remove('bg-green-500', 'text-white');
+                    copyBtn.classList.add('bg-secondary', 'text-secondary-foreground');
+                }, 2000);
+            }).catch(() => {
+                copyBtn.textContent = 'Copy Failed';
+                copyBtn.classList.add('bg-destructive', 'text-destructive-foreground');
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy';
+                    copyBtn.classList.remove('bg-destructive', 'text-destructive-foreground');
+                    copyBtn.classList.add('bg-secondary', 'text-secondary-foreground');
+                }, 2000);
+            });
+        });
+
+        // Drag and drop functionality
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-primary/50');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-primary/50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary/50');
+
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                // Simulate file input change
+                const dataTransfer = new DataTransfer();
+                files.forEach(file => dataTransfer.items.add(file));
+                fileInput.files = dataTransfer.files;
+
+                // Trigger change event
+                fileInput.dispatchEvent(new Event('change'));
+
+                // Show visual feedback
+                dropZone.classList.add('border-green-400');
+                setTimeout(() => {
+                    dropZone.classList.remove('border-green-400');
+                }, 1000);
+            }
+        });
     </script>
 </body>
 
